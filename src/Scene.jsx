@@ -6,6 +6,7 @@ import { getPlanetPosition, getOrbitPath } from './utils/astronomy'
 import { Planet, Orbit } from './Planet'
 import { useStore } from './store'
 import RealSky from './RealSky'
+import { Earth3D, EarthFallback } from './Earth3D'
 import AsteroidCloud from './AsteroidCloud'
 import MajorAsteroids from './MajorAsteroids'
 import * as THREE from 'three'
@@ -22,7 +23,7 @@ function CameraManager() {
     if (activePlanetData && controlsRef.current) {
       let vecPos;
 
-      // Check for direct static position (Asteroids) vs Orbital Elements (Planets)
+      // Check for direct static position (Asteroids/Constellations) vs Orbital Elements (Planets)
       if (activePlanetData.staticPosition) {
         vecPos = new THREE.Vector3(...activePlanetData.staticPosition);
       } else {
@@ -30,22 +31,32 @@ function CameraManager() {
         vecPos = new THREE.Vector3(...pos);
       }
 
-      // Look directly at it, and move closer
-      // We want to be at some distance from the planet
-      // Planet size
-      const size = activePlanetData.size || 1;
-      const distance = size * 10; // 10x radius distance
-      if (distance < 5) distance = 5; // Min distance for small rocks
+      // --- NEW LOGIC: Type-Based Navigation ---
+      if (activePlanetData.type === 'Constellation') {
+        // CONSTELLATION MODE: Stay at center, look at the sky
+        controlsRef.current.setLookAt(
+          0, 20, 40,      // Camera near Earth/Sun
+          vecPos.x, vecPos.y, vecPos.z, // Look at the Stars
+          true
+        );
+      } else {
+        // PLANET/ASTEROID MODE: Fly to object
 
-      // Offset from planet for the camera
-      const offset = new THREE.Vector3(distance, distance / 2, distance);
-      const camPos = vecPos.clone().add(offset);
+        // Planet size logic
+        const size = activePlanetData.size || 1;
+        const distance = size * 10; // 10x radius distance
+        let safeDist = distance < 5 ? 5 : distance;
 
-      controlsRef.current.setLookAt(
-        camPos.x, camPos.y, camPos.z,
-        vecPos.x, vecPos.y, vecPos.z,
-        true // enable transition
-      );
+        // Offset from planet for the camera
+        const offset = new THREE.Vector3(safeDist, safeDist / 2, safeDist);
+        const camPos = vecPos.clone().add(offset);
+
+        controlsRef.current.setLookAt(
+          camPos.x, camPos.y, camPos.z,
+          vecPos.x, vecPos.y, vecPos.z,
+          true // enable transition
+        );
+      }
     } else if (controlsRef.current) {
       // Reset view to overview
       controlsRef.current.setLookAt(
@@ -75,35 +86,47 @@ export default function Scene() {
       {/* Camera Logic */}
       <CameraManager />
 
-      {/* The Sun */}
-      <mesh position={[0, 0, 0]}>
-        <sphereGeometry args={[10, 32, 32]} />
-        <meshBasicMaterial color="#FFD700" />
-      </mesh>
+      <React.Suspense fallback={null}>
 
-      {/* ASTEROIDS RENDERING */}
-      <AsteroidCloud />
-      <MajorAsteroids />
+        {/* The Sun */}
+        <mesh position={[0, 0, 0]}>
+          <sphereGeometry args={[10, 32, 32]} />
+          <meshBasicMaterial color="#FFD700" />
+        </mesh>
 
-      {planetData.map((planet) => {
-        const position = getPlanetPosition(planet, currentDate);
-        const orbitPath = getOrbitPath(planet);
+        {/* ASTEROIDS RENDERING */}
+        <AsteroidCloud />
+        <MajorAsteroids />
 
-        return (
-          <React.Fragment key={planet.name}>
-            <Orbit points={orbitPath} color={planet.color} />
-            <Planet
-              position={position}
-              color={planet.color}
-              size={planet.size}
-              name={planet.name}
-              data={planet}
-            />
-          </React.Fragment>
-        )
-      })}
+        {planetData.map((planet) => {
+          const position = getPlanetPosition(planet, currentDate);
+          const orbitPath = getOrbitPath(planet);
 
-      <RealSky />
+          if (planet.name === 'Earth') {
+            return (
+              <React.Fragment key={planet.name}>
+                <Orbit points={orbitPath} color={planet.color} />
+                <Earth3D position={position} size={planet.size} />
+              </React.Fragment>
+            )
+          }
+
+          return (
+            <React.Fragment key={planet.name}>
+              <Orbit points={orbitPath} color={planet.color} />
+              <Planet
+                position={position}
+                color={planet.color}
+                size={planet.size}
+                name={planet.name}
+                data={planet}
+              />
+            </React.Fragment>
+          )
+        })}
+
+        <RealSky />
+      </React.Suspense>
     </>
   )
 }
