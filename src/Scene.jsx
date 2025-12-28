@@ -106,7 +106,7 @@ export default function Scene() {
             return (
               <React.Fragment key={planet.name}>
                 <Orbit points={orbitPath} color={planet.color} />
-                <Earth3D position={position} size={planet.size} />
+                <Earth3D position={position} size={planet.size} data={planet} />
               </React.Fragment>
             )
           }

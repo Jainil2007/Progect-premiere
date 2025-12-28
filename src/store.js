@@ -29,5 +29,9 @@ export const useStore = create((set, get) => ({
         }
     },
 
-    clearSelection: () => set({ activePlanet: null, activePlanetData: null, planetFacts: "" })
+    clearSelection: () => set({ activePlanet: null, activePlanetData: null, planetFacts: "" }),
+
+    // NASA Portal State
+    nasaPortalOpen: false,
+    setNasaPortalOpen: (isOpen) => set({ nasaPortalOpen: isOpen })
 }))

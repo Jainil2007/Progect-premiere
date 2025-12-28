@@ -4,11 +4,15 @@ import Overlay from './Overlay'
 import { useStore } from './store'
 
 import SearchBar from './SearchBar'
+import NasaPortal from './NasaPortal'
 
 function App() {
+  const nasaPortalOpen = useStore(state => state.nasaPortalOpen);
+
   return (
     <div style={{ width: '100vw', height: '100vh', position: 'relative' }}>
       <SearchBar />
+      {nasaPortalOpen && <NasaPortal />}
       <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', zIndex: 1 }}>
         <Overlay />
         <Canvas
