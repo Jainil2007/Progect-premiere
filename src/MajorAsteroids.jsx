@@ -5,8 +5,8 @@ import { getPlanetPosition, getOrbitPath } from './utils/astronomy';
 const asteroidData = [
     {
         name: 'Ceres',
-        color: '#a05a2c', // Reddish-Brown
-        size: 3.0,
+        color: '#ff5500', // Orange-Red
+        size: 10.0,
         a: 2.7663,
         e: 0.0785,
         i: 10.587,
@@ -18,8 +18,8 @@ const asteroidData = [
     },
     {
         name: 'Vesta',
-        color: '#b06b3e', // Slightly lighter reddish-brown
-        size: 2.8,
+        color: '#ff5500',
+        size: 9.0,
         a: 2.3614,
         e: 0.0886,
         i: 7.142,
@@ -31,8 +31,8 @@ const asteroidData = [
     },
     {
         name: 'Pallas',
-        color: '#8f4e25', // Darker reddish-brown
-        size: 2.8,
+        color: '#ff5500', // Orange-Red
+        size: 9.0,
         a: 2.7716,
         e: 0.2299,
         i: 34.841,
@@ -44,8 +44,8 @@ const asteroidData = [
     },
     {
         name: 'Hygiea',
-        color: '#7d4420', // Deep reddish-brown
-        size: 2.5,
+        color: '#ff5500', // Orange-Red
+        size: 8.0,
         a: 3.139,
         e: 0.112,
         i: 3.84,

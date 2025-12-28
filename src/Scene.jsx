@@ -69,7 +69,8 @@ export default function Scene() {
 
       {/* Sun Light - Point light at center */}
       <pointLight position={[0, 0, 0]} intensity={1.5} distance={5000} decay={0.5} />
-      <ambientLight intensity={0.1} />
+      <ambientLight intensity={0.5} />
+      <hemisphereLight args={['#ffffff', '#444444', 0.2]} />
 
       {/* Camera Logic */}
       <CameraManager />

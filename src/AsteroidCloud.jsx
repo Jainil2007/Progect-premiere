@@ -57,10 +57,10 @@ export default function AsteroidCloud({ count = 4000 }) {
 
     return (
         <instancedMesh ref={meshRef} args={[null, null, count]}>
-            {/* Cloud Size: Radius 0.8 (Much larger for visibility) */}
-            <dodecahedronGeometry args={[0.8, 0]} />
-            {/* Cloud Material: Bright Light Grey (#cccccc) */}
-            <meshStandardMaterial color="#cccccc" roughness={0.9} metalness={0.1} />
+            {/* Cloud Size: Radius 4.0 (5x larger) */}
+            <dodecahedronGeometry args={[4.0, 0]} />
+            {/* Cloud Material: Mid-tone Grey (#888888) */}
+            <meshStandardMaterial color="#888888" roughness={0.8} metalness={0.1} />
         </instancedMesh>
     );
 }
