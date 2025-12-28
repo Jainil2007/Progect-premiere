@@ -6,8 +6,12 @@ import { getPlanetPosition, getOrbitPath } from './utils/astronomy'
 import { Planet, Orbit } from './Planet'
 import { useStore } from './store'
 import RealStarfield from './RealStarfield'
-import AsteroidBelt from './AsteroidBelt'
+import AsteroidCloud from './AsteroidCloud'
+import MajorAsteroids from './MajorAsteroids'
 import * as THREE from 'three'
+
+// Debug Log outside component
+console.log("Main Scene Module Loaded");
 
 function CameraManager() {
   const controlsRef = useRef();
@@ -52,14 +56,12 @@ function CameraManager() {
     }
   }, [activePlanetData]);
 
-  // Keep updating the look target if the planet is moving?
-  // For now we just move once on click. Real-time tracking would need useFrame.
-
   return <CameraControls ref={controlsRef} minDistance={10} maxDistance={20000} />;
 }
 
 export default function Scene() {
   const currentDate = useMemo(() => new Date(), []);
+  console.log("Main Scene Rendering");
 
   return (
     <>
@@ -78,8 +80,9 @@ export default function Scene() {
         <meshBasicMaterial color="#FFD700" />
       </mesh>
 
-      {/* DEBUG PLACEMENT */}
-      <AsteroidBelt />
+      {/* ASTEROIDS RENDERING */}
+      <AsteroidCloud />
+      <MajorAsteroids />
 
       {planetData.map((planet) => {
         const position = getPlanetPosition(planet, currentDate);
