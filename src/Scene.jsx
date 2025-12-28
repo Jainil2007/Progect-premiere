@@ -5,7 +5,7 @@ import { planetData } from './solarSystemData'
 import { getPlanetPosition, getOrbitPath } from './utils/astronomy'
 import { Planet, Orbit } from './Planet'
 import { useStore } from './store'
-import RealStarfield from './RealStarfield'
+import RealSky from './RealSky'
 import AsteroidCloud from './AsteroidCloud'
 import MajorAsteroids from './MajorAsteroids'
 import * as THREE from 'three'
@@ -103,7 +103,7 @@ export default function Scene() {
         )
       })}
 
-      <RealStarfield />
+      <RealSky />
     </>
   )
 }
