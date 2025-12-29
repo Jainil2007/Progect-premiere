@@ -1,10 +1,9 @@
 import { Canvas } from '@react-three/fiber'
 import Scene from './Scene'
-import Overlay from './Overlay'
-import { useStore } from './store'
-
+import Dashboard from './Dashboard'
 import SearchBar from './SearchBar'
 import NasaPortal from './NasaPortal'
+import { useStore } from './store'
 
 function App() {
   const nasaPortalOpen = useStore(state => state.nasaPortalOpen);
@@ -14,7 +13,7 @@ function App() {
       <SearchBar />
       {nasaPortalOpen && <NasaPortal />}
       <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', zIndex: 1 }}>
-        <Overlay />
+        <Dashboard />
         <Canvas
           camera={{ position: [0, 200, 500], fov: 45, far: 100000 }}
           onPointerMissed={() => useStore.getState().clearSelection()}

@@ -81,7 +81,8 @@ export default function SearchBar() {
         <div style={{
             position: 'absolute',
             top: '20px',
-            left: '20px',
+            left: '50%',
+            transform: 'translateX(-50%)',
             zIndex: 2000,
             width: '300px',
             fontFamily: "'Rajdhani', sans-serif"
