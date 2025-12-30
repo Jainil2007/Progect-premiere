@@ -5,21 +5,31 @@ const genAI = new GoogleGenerativeAI(API_KEY);
 
 export async function fetchPlanetData(planetName) {
     try {
-        const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+        const model = genAI.getGenerativeModel({ model: "gemini-3-flash-preview" });
 
         // Structured JSON Prompt
         const prompt = `Generate a JSON object for the celestial body "${planetName}".
         The JSON must strictly follow this schema (no markdown formatting, just raw JSON):
         {
-            "summary": "2 sentence scientific summary of the body.",
-            "discoveries": [
-                "Discovery 1 (Year)",
-                "Discovery 2 (Year)",
-                "Discovery 3 (Year)"
+            "latest_news": [
+                { "headline": "Headline 1", "date": "Date", "body": "Short paragraph." },
+                { "headline": "Headline 2", "date": "Date", "body": "Short paragraph." },
+                { "headline": "Headline 3", "date": "Date", "body": "Short paragraph." },
+                { "headline": "Headline 4", "date": "Date", "body": "Short paragraph." },
+                { "headline": "Headline 5", "date": "Date", "body": "Short paragraph." }
             ],
-            "keyTheories": [
-                "Theory 1",
-                "Theory 2"
+            "deep_dive": "A detailed 300-word scientific article about the geology, potential for life, and future exploration of this body.",
+            "history_timeline": [
+                { "date": "Year", "event": "Event description" },
+                { "date": "Year", "event": "Event description" },
+                { "date": "Year", "event": "Event description" },
+                { "date": "Year", "event": "Event description" },
+                { "date": "Year", "event": "Event description" }
+            ],
+            "pop_culture": [
+                "Mention in Movie/Book 1",
+                "Mention in Movie/Book 2",
+                "Mention in Movie/Book 3"
             ],
             "deepStats": [
                 { "label": "Mean Density", "value": "5.51 g/cm³" },
