@@ -1,6 +1,7 @@
 import React, { useMemo, useRef, useState } from 'react';
-import { useFrame } from '@react-three/fiber';
+import { useFrame, useLoader } from '@react-three/fiber';
 import { Text, Billboard } from '@react-three/drei';
+import { TextureLoader } from 'three';
 import { useStore } from './store';
 import { Orbit } from './Planet'; // Keep Orbit import
 import { getPlanetPosition, getOrbitPath } from './utils/astronomy';
@@ -11,6 +12,16 @@ function Asteroid({ position, color, size, name, data }) {
     const rotatingGroup = useRef();
     const selectPlanet = useStore((state) => state.selectPlanet);
     const [hovered, setHover] = useState(false);
+
+    // Visual Upgrade: Load Rock Texture
+    const texture = useLoader(TextureLoader, '/textures/mercury.jpg');
+
+    // Random initial rotation for variety
+    const randomRotation = useMemo(() => [
+        Math.random() * Math.PI,
+        Math.random() * Math.PI,
+        0
+    ], []);
 
     useFrame((state, delta) => {
         if (rotatingGroup.current) {
@@ -26,19 +37,24 @@ function Asteroid({ position, color, size, name, data }) {
 
     return (
         <group position={position}>
-            {/* Rotating Mesh */}
+            {/* Rotating Mesh Group */}
             <group ref={rotatingGroup}>
+                {/* Apply Random Rotation to the Mesh itself to create variety */}
                 <mesh
+                    rotation={randomRotation}
                     onClick={handleClick}
                     onPointerOver={() => setHover(true)}
                     onPointerOut={() => setHover(false)}
                 >
-                    <sphereGeometry args={[size, 16, 16]} />
+                    <dodecahedronGeometry args={[size, 0]} /> {/* Jagged Rock Shape */}
                     <meshStandardMaterial
-                        color={color || '#888888'}
-                        roughness={0.9}
-                        emissive={hovered ? color : 'black'}
-                        emissiveIntensity={hovered ? 0.5 : 0}
+                        map={texture}
+                        bumpMap={texture}
+                        bumpScale={0.2}
+                        color="#999999"
+                        roughness={0.8}
+                        emissive={hovered ? '#444444' : 'black'}
+                        emissiveIntensity={hovered ? 0.3 : 0}
                     />
                 </mesh>
             </group>
