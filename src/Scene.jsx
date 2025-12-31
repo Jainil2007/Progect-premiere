@@ -4,6 +4,7 @@ import { useFrame, useThree } from '@react-three/fiber'
 import { planetData } from './solarSystemData'
 import { getPlanetPosition, getOrbitPath } from './utils/astronomy'
 import { Planet, Orbit } from './Planet'
+import Sun from './Sun'
 import { useStore } from './store'
 import RealSky from './RealSky'
 import { Earth3D, EarthFallback } from './Earth3D'
@@ -88,11 +89,8 @@ export default function Scene() {
 
       <React.Suspense fallback={null}>
 
-        {/* The Sun */}
-        <mesh position={[0, 0, 0]}>
-          <sphereGeometry args={[10, 32, 32]} />
-          <meshBasicMaterial color="#FFD700" />
-        </mesh>
+        {/* The Sun - Always render explicitly to ensure it exists */}
+        <Sun position={[0, 0, 0]} size={10} name="Sun" />
 
         {/* ASTEROIDS RENDERING */}
         <AsteroidCloud />
@@ -102,6 +100,12 @@ export default function Scene() {
           const position = getPlanetPosition(planet, currentDate);
           const orbitPath = getOrbitPath(planet);
 
+          // If Sun is in data, render it (via Sun component)
+          if (planet.name === 'Sun') {
+            return <Sun key={planet.name} {...planet} />
+          }
+
+          // Earth has custom component
           if (planet.name === 'Earth') {
             return (
               <React.Fragment key={planet.name}>
@@ -111,6 +115,7 @@ export default function Scene() {
             )
           }
 
+          // Other Planets: Must have texturePath
           return (
             <React.Fragment key={planet.name}>
               <Orbit points={orbitPath} color={planet.color} />
@@ -120,6 +125,7 @@ export default function Scene() {
                 size={planet.size}
                 name={planet.name}
                 data={planet}
+                texturePath={planet.texturePath}
               />
             </React.Fragment>
           )

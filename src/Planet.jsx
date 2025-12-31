@@ -1,49 +1,73 @@
-import React, { useRef, useState } from 'react';
-import { useFrame } from '@react-three/fiber';
-import { Text } from '@react-three/drei';
-import { useStore } from './store';
 
-export function Planet({ position, color, size, name, data }) {
-    const meshRef = useRef();
+import React, { useRef, useState } from 'react';
+import { useFrame, useLoader } from '@react-three/fiber';
+import { Text, Billboard } from '@react-three/drei';
+import { useStore } from './store';
+import { TextureLoader, DoubleSide } from 'three';
+
+function SaturnRing({ size }) {
+    const ringTexture = useLoader(TextureLoader, '/textures/saturn_ring.png');
+
+    return (
+        <mesh rotation={[-Math.PI / 2, 0, 0]}>
+            <ringGeometry args={[size * 1.2, size * 2.3, 64]} />
+            <meshStandardMaterial map={ringTexture} transparent side={DoubleSide} opacity={0.8} />
+        </mesh>
+    );
+}
+
+export function Planet({ position, color, size, name, data, texturePath }) {
+    // CRITICAL FIX: Prevent loader from running if texture is missing
+    if (!texturePath) return null;
+
+    const rotatingGroup = useRef();
     const selectPlanet = useStore((state) => state.selectPlanet);
     const [hovered, setHover] = useState(false);
 
-    // Slow rotation
+    const texture = useLoader(TextureLoader, texturePath);
+
     useFrame((state, delta) => {
-        if (meshRef.current) {
-            meshRef.current.rotation.y += delta * 0.5;
+        if (rotatingGroup.current) {
+            rotatingGroup.current.rotation.y += delta * 0.5;
         }
     });
 
     const handleClick = (e) => {
         e.stopPropagation();
-        selectPlanet(data); // Pass the full planet data object
+        selectPlanet(data);
     };
 
     return (
         <group position={position}>
-            <mesh
-                ref={meshRef}
-                onClick={handleClick}
-                onPointerOver={() => setHover(true)}
-                onPointerOut={() => setHover(false)}
-            >
-                <sphereGeometry args={[size, 32, 32]} />
-                <meshStandardMaterial
-                    color={color}
-                    emissive={hovered ? color : 'black'}
-                    emissiveIntensity={hovered ? 0.5 : 0}
-                />
-            </mesh>
-            <Text
-                position={[0, size + 2, 0]}
-                fontSize={size * 0.5 + 2} // Adaptive text size
-                color="white"
-                anchorX="center"
-                anchorY="middle"
-            >
-                {name}
-            </Text>
+            {/* Rotating Helper Group (Planet + Rings) */}
+            <group ref={rotatingGroup}>
+                <mesh
+                    onClick={handleClick}
+                    onPointerOver={() => setHover(true)}
+                    onPointerOut={() => setHover(false)}
+                >
+                    <sphereGeometry args={[size, 32, 32]} />
+                    <meshStandardMaterial
+                        map={texture}
+                        color={color}
+                        emissive={hovered ? color : 'black'}
+                        emissiveIntensity={hovered ? 0.5 : 0}
+                    />
+                </mesh>
+                {name === 'Saturn' && <SaturnRing size={size} />}
+            </group>
+
+            {/* Stable Label (Billboard) */}
+            <Billboard position={[0, size + 2, 0]}>
+                <Text
+                    fontSize={size * 0.5 + 2}
+                    color="white"
+                    anchorX="center"
+                    anchorY="middle"
+                >
+                    {name}
+                </Text>
+            </Billboard>
         </group>
     );
 }

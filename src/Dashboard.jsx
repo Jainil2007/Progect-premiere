@@ -9,6 +9,8 @@ const glassStyle = {
     boxShadow: '0 4px 30px rgba(0, 0, 0, 0.5)'
 };
 
+const sessionCache = {};
+
 export default function Dashboard() {
     const { activePlanet, activePlanetData, clearSelection } = useStore();
 
@@ -38,14 +40,14 @@ export default function Dashboard() {
             // 1. Fetch AI Data
             const getAiData = async () => {
                 const cacheKey = `ai_data_${activePlanetData.name}`;
-                const cached = localStorage.getItem(cacheKey);
+                const cached = sessionCache[cacheKey];
 
                 if (cached) {
                     try {
-                        setAiData(JSON.parse(cached));
+                        setAiData(cached);
                         return;
                     } catch (e) {
-                        localStorage.removeItem(cacheKey);
+                        // Should not happen with object cache, but safe to ignore
                     }
                 }
 
@@ -54,7 +56,7 @@ export default function Dashboard() {
                     const data = await fetchPlanetData(activePlanetData.name);
                     if (data) {
                         setAiData(data);
-                        localStorage.setItem(cacheKey, JSON.stringify(data));
+                        sessionCache[cacheKey] = data;
                     }
                 } catch (err) {
                     console.error("AI Fetch Error", err);

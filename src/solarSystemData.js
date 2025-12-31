@@ -10,7 +10,8 @@ export const planetData = [
         w: 29.124,   // Argument of perihelion
         M: 174.796,  // Mean anomaly at J2000
         description: "The smallest planet in the Solar System and closest to the Sun. It has a cratered surface similar to the Moon and no atmosphere to retain heat.",
-        fact: "Mercury has the most eccentric orbit of all the planets."
+        fact: "Mercury has the most eccentric orbit of all the planets.",
+        texturePath: '/textures/mercury.jpg'
     },
     {
         name: 'Venus',
@@ -23,7 +24,8 @@ export const planetData = [
         w: 54.884,
         M: 50.115,
         description: "The second planet from the Sun. It has a thick, toxic atmosphere that traps heat, making it the hottest planet in the Solar System.",
-        fact: "Venus spins in the opposite direction to most other planets."
+        fact: "Venus spins in the opposite direction to most other planets.",
+        texturePath: '/textures/venus.jpg'
     },
     {
         name: 'Earth',
@@ -36,7 +38,8 @@ export const planetData = [
         w: 102.94719,
         M: 357.51716,
         description: "The third planet from the Sun and the only astronomical object known to harbor life. About 71% of Earth's surface is covered with water.",
-        fact: "Earth is the densest planet in the Solar System."
+        fact: "Earth is the densest planet in the Solar System.",
+        texturePath: '/textures/earth_daymap.jpg'
     },
     {
         name: 'Mars',
@@ -49,7 +52,8 @@ export const planetData = [
         w: 286.502,
         M: 19.412,
         description: "The fourth planet from the Sun, often called the 'Red Planet' due to reddish iron oxide prevalent on its surface. It has a thin atmosphere.",
-        fact: "Mars is home to Olympus Mons, the tallest planetary mountain in the Solar System."
+        fact: "Mars is home to Olympus Mons, the tallest planetary mountain in the Solar System.",
+        texturePath: '/textures/mars.jpg'
     },
     {
         name: 'Jupiter',
@@ -62,7 +66,8 @@ export const planetData = [
         w: 273.867,
         M: 20.020,
         description: "The fifth planet from the Sun and the largest in the Solar System. It is a gas giant with a mass more than two and a half times that of all the other planets combined.",
-        fact: "The Great Red Spot is a giant storm that has been raging for at least 300 years."
+        fact: "The Great Red Spot is a giant storm that has been raging for at least 300 years.",
+        texturePath: '/textures/jupiter.jpg'
     },
     {
         name: 'Saturn',
@@ -75,7 +80,8 @@ export const planetData = [
         w: 339.392,
         M: 317.020,
         description: "The sixth planet from the Sun and the second-largest in the Solar System. It is a gas giant with an average radius of about nine and a half times that of Earth.",
-        fact: "Saturn has the most extensive ring system of any planet in the Solar System."
+        fact: "Saturn has the most extensive ring system of any planet in the Solar System.",
+        texturePath: '/textures/saturn.jpg'
     },
     {
         name: 'Uranus',
@@ -88,7 +94,8 @@ export const planetData = [
         w: 96.998857,
         M: 141.050,
         description: "The seventh planet from the Sun. It has the third-largest planetary radius and fourth-largest planetary mass in the Solar System.",
-        fact: "Uranus rotates on its side, making its seasons extreme and long-lasting."
+        fact: "Uranus rotates on its side, making its seasons extreme and long-lasting.",
+        texturePath: '/textures/uranus.jpg'
     },
     {
         name: 'Neptune',
@@ -101,6 +108,7 @@ export const planetData = [
         w: 273.187,
         M: 256.228,
         description: "The eighth and farthest-known Solar planet from the Sun. In the Solar System, it is the fourth-largest planet by diameter, the third-most-massive planet, and the densest giant planet.",
-        fact: "Neptune has the strongest winds of any planet in the Solar System."
+        fact: "Neptune has the strongest winds of any planet in the Solar System.",
+        texturePath: '/textures/neptune.jpg'
     }
 ];
