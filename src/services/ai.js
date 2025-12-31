@@ -3,9 +3,9 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 const API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
 const genAI = new GoogleGenerativeAI(API_KEY);
 
-export async function fetchPlanetData(planetName) {
+export async function fetchPlanetData(planetName, model = "gemini-3-flash-preview") {
     try {
-        const model = genAI.getGenerativeModel({ model: "gemini-3-flash-preview" });
+        const aiModel = genAI.getGenerativeModel({ model: model });
 
         // Structured JSON Prompt
         const prompt = `Generate a JSON object for the celestial body "${planetName}".

@@ -1,6 +1,45 @@
 import React, { useState, useEffect } from 'react';
 import { useStore } from './store';
-import { fetchPlanetData } from './services/ai';
+import { GoogleGenerativeAI } from "@google/generative-ai";
+
+const MODELS = [
+    "gemini-3-flash-preview", "gemini-3-pro-preview",
+    "gemini-2.5-flash", "gemini-2.5-pro", "gemini-2.5-flash-lite",
+    "gemini-2.5-flash-preview-09-2025", "gemini-2.5-flash-lite-preview-09-2025",
+    "gemini-2.0-flash", "gemini-2.0-flash-exp", "gemini-2.0-flash-001",
+    "gemini-2.0-flash-lite", "gemini-2.0-flash-lite-001", "gemini-2.0-flash-lite-preview", "gemini-2.0-flash-lite-preview-02-05"
+];
+
+const PROMPT_TEMPLATE = (planetName) => `Generate a JSON object for the celestial body "${planetName}".
+The JSON must strictly follow this schema (no markdown formatting, just raw JSON):
+{
+    "latest_news": [
+        { "headline": "Headline 1", "date": "Date", "body": "Short paragraph." },
+        { "headline": "Headline 2", "date": "Date", "body": "Short paragraph." },
+        { "headline": "Headline 3", "date": "Date", "body": "Short paragraph." },
+        { "headline": "Headline 4", "date": "Date", "body": "Short paragraph." },
+        { "headline": "Headline 5", "date": "Date", "body": "Short paragraph." }
+    ],
+    "deep_dive": "A detailed 300-word scientific article about the geology, potential for life, and future exploration of this body.",
+    "history_timeline": [
+        { "date": "Year", "event": "Event description" },
+        { "date": "Year", "event": "Event description" },
+        { "date": "Year", "event": "Event description" },
+        { "date": "Year", "event": "Event description" },
+        { "date": "Year", "event": "Event description" }
+    ],
+    "pop_culture": [
+        "Mention in Movie/Book 1",
+        "Mention in Movie/Book 2",
+        "Mention in Movie/Book 3"
+    ],
+    "deepStats": [
+        { "label": "Mean Density", "value": "5.51 g/cm³" },
+        { "label": "Atmosphere", "value": "N2, O2, Ar" },
+        ... (Total 5 scientifically accurate stats like Surface Gravity, Escape Velocity, Core Temp, etc)
+    ]
+}
+Keep descriptions concise and scientific.`;
 
 const glassStyle = {
     background: 'rgba(10, 10, 14, 0.7)',
@@ -10,6 +49,7 @@ const glassStyle = {
 };
 
 const sessionCache = {};
+const API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
 
 export default function Dashboard() {
     const { activePlanet, activePlanetData, clearSelection } = useStore();
@@ -20,103 +60,114 @@ export default function Dashboard() {
     const [showRight, setShowRight] = useState(true);
     const [showBottom, setShowBottom] = useState(true);
     const [isFeedExpanded, setIsFeedExpanded] = useState(false);
+    const [showModelList, setShowModelList] = useState(false);
 
     // Data States
+    const [currentModel, setCurrentModel] = useState("gemini-3-flash-preview");
     const [aiData, setAiData] = useState(null);
-    const [dataSource, setDataSource] = useState(''); // 'Local Archive' | 'Live Uplink' | 'System Alert'
     const [loadingAi, setLoadingAi] = useState(false);
+    const [errorMsg, setErrorMsg] = useState(null);
     const [wikiData, setWikiData] = useState(null);
-    const [images, setImages] = useState([]); // NASA Images
+    const [images, setImages] = useState([]);
     const [selectedImage, setSelectedImage] = useState(null);
 
+    // Initial Planet Load
     useEffect(() => {
         if (activePlanetData) {
             setVisible(true);
+            setIsFeedExpanded(false);
             setAiData(null);
+            setErrorMsg(null);
             setWikiData(null);
             setImages([]);
-            setIsFeedExpanded(false); // Reset expansion on planet change
 
-            // 1. Fetch AI Data
-            const getAiData = async () => {
-                const cacheKey = `ai_data_${activePlanetData.name}`;
-                const cached = sessionCache[cacheKey];
-
-                if (cached) {
-                    try {
-                        setAiData(cached);
-                        return;
-                    } catch (e) {
-                        // Should not happen with object cache, but safe to ignore
-                    }
-                }
-
-                setLoadingAi(true);
-                try {
-                    const data = await fetchPlanetData(activePlanetData.name);
-                    if (data) {
-                        setAiData(data);
-                        sessionCache[cacheKey] = data;
-                    }
-                } catch (err) {
-                    console.error("AI Fetch Error", err);
-                    if (err.message && err.message.includes("429")) {
-                        setAiData({
-                            latest_news: [{ headline: "Data Limit Reached.", date: "System Alert", body: "Using cached archive protocols. Live uplink failed." }],
-                            history_timeline: [{ date: "2024", event: "Connection Limit Exceeded" }],
-                            pop_culture: ["System Offline"]
-                        });
-                    } else {
-                        setAiData({
-                            latest_news: [{ headline: "Uplink Failed", date: "Now", body: "Connection to Mission Control interrupted." }]
-                        });
-                    }
-                }
-                setLoadingAi(false);
-            };
-            getAiData();
-
-            // 2. Fetch Wikipedia Data (Summary & Image)
-            const getWikiData = async () => {
-                try {
-                    const res = await fetch(`https://en.wikipedia.org/api/rest_v1/page/summary/${activePlanetData.name}`);
-                    const data = await res.json();
-                    if (data.extract) {
-                        setWikiData({
-                            intro: data.extract,
-                            image: data.originalimage ? data.originalimage.source : null
-                        });
-                    }
-                } catch (e) {
-                    console.error("Wiki fetch error", e);
-                }
-            };
-            getWikiData();
-
-            // 3. Fetch NASA Images (Preserved Logic)
-            const fetchImages = async () => {
-                try {
-                    const response = await fetch(`https://images-api.nasa.gov/search?q=${activePlanetData.name}&media_type=image`);
-                    const data = await response.json();
-                    if (data.collection?.items) {
-                        const items = data.collection.items.slice(0, 4).map(item => ({
-                            id: item.data[0].nasa_id,
-                            title: item.data[0].title,
-                            desc: item.data[0].description,
-                            thumb: item.links?.[0]?.href || '',
-                        })).filter(i => i.thumb);
-                        setImages(items);
-                    }
-                } catch (err) { console.error(err); }
-            };
-            fetchImages();
-
+            fetchInternalData();
         } else {
             setVisible(false);
         }
     }, [activePlanetData]);
 
-    // Scroll Logic
+    // Re-fetch on model switch
+    useEffect(() => {
+        if (activePlanetData) {
+            fetchInternalData();
+        }
+    }, [currentModel]);
+
+
+    const fetchInternalData = async () => {
+        // AI Fetch Logic (Defined internally to access currentModel state correctly)
+        const cacheKey = `ai_data_${activePlanetData.name}_${currentModel}`;
+        const cached = sessionCache[cacheKey];
+
+        if (cached) {
+            setAiData(cached);
+            setErrorMsg(null);
+        } else {
+            setLoadingAi(true);
+            setErrorMsg(null);
+            setAiData(null);
+            try {
+                // Dynamic Initialization
+                const genAI = new GoogleGenerativeAI(API_KEY);
+                const model = genAI.getGenerativeModel({ model: currentModel });
+
+                const result = await model.generateContent(PROMPT_TEMPLATE(activePlanetData.name));
+                const response = await result.response;
+                const text = response.text();
+                const jsonStr = text.replace(/```json/g, '').replace(/```/g, '').trim();
+                const data = JSON.parse(jsonStr);
+
+                if (data) {
+                    setAiData(data);
+                    sessionCache[cacheKey] = data;
+                }
+            } catch (err) {
+                console.error("AI Fetch Error", err);
+                if (err.message && err.message.includes("429")) {
+                    setErrorMsg("CRITICAL: API Quota Exceeded. Model Unavailable.");
+                } else {
+                    setErrorMsg("Connection Failed.");
+                }
+            }
+            setLoadingAi(false);
+        }
+
+        // Wiki Fetch
+        if (!wikiData) {
+            try {
+                const res = await fetch(`https://en.wikipedia.org/api/rest_v1/page/summary/${activePlanetData.name}`);
+                const data = await res.json();
+                if (data.extract) {
+                    setWikiData({
+                        intro: data.extract,
+                        image: data.originalimage ? data.originalimage.source : null
+                    });
+                }
+            } catch (e) {
+                console.error("Wiki fetch error", e);
+            }
+        }
+
+        // Image Fetch
+        if (images.length === 0) {
+            try {
+                const response = await fetch(`https://images-api.nasa.gov/search?q=${activePlanetData.name}&media_type=image`);
+                const data = await response.json();
+                if (data.collection?.items) {
+                    const items = data.collection.items.slice(0, 4).map(item => ({
+                        id: item.data[0].nasa_id,
+                        title: item.data[0].title,
+                        desc: item.data[0].description,
+                        thumb: item.links?.[0]?.href || '',
+                    })).filter(i => i.thumb);
+                    setImages(items);
+                }
+            } catch (err) { console.error(err); }
+        }
+    };
+
+
     const handleWheel = (e) => {
         if (e.deltaY < -10 && !isFeedExpanded) {
             setIsFeedExpanded(true);
@@ -187,12 +238,50 @@ export default function Dashboard() {
                     {isFeedExpanded ? 'v' : '^'}
                 </button>
 
+                {/* MODEL SWITCHER (Moved to Bottom Panel) */}
+                <div
+                    style={styles.modelSwitcher}
+                    onMouseEnter={() => setShowModelList(true)}
+                    onMouseLeave={() => setShowModelList(false)}
+                >
+                    <div style={styles.modelCurrent}>
+                        <span style={{ opacity: 0.5, marginRight: '8px' }}>MODEL:</span>
+                        {currentModel}
+                    </div>
+                    {/* Dropdown Opening Upwards */}
+                    {showModelList && (
+                        <div style={styles.modelDropdown}>
+                            {MODELS.map(model => (
+                                <div
+                                    key={model}
+                                    style={{
+                                        ...styles.modelOption,
+                                        background: currentModel === model ? 'rgba(255,255,255,0.1)' : 'transparent',
+                                        color: currentModel === model ? '#00ccff' : '#aaa'
+                                    }}
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        setCurrentModel(model);
+                                        setShowModelList(false);
+                                    }}
+                                >
+                                    {model}
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
+
                 <div style={{ opacity: isFeedExpanded ? 0 : 1, ...styles.panelLabel }}>
                     MISSION FEED | {loadingAi ? 'UPLINKING...' : 'ONLINE'}
                 </div>
 
                 <div style={{ height: '100%', overflowY: isFeedExpanded ? 'auto' : 'hidden', padding: isFeedExpanded ? '40px' : '0' }}>
-                    {isFeedExpanded ? (
+                    {loadingAi ? (
+                        <div className="loader"></div>
+                    ) : errorMsg ? (
+                        <div className="error-text">{errorMsg}</div>
+                    ) : isFeedExpanded ? (
                         // EXPANDED MAGAZINE VIEW
                         <div style={styles.magazineLayout}>
                             {/* Hero Section (Wiki) */}
@@ -308,7 +397,7 @@ const styles = {
     panel: { ...glassStyle, padding: '20px', position: 'absolute', transition: 'all 0.5s ease-in-out' },
     leftPanel: { top: 0, left: 0, bottom: 0, width: '300px', zIndex: 20, display: 'flex', flexDirection: 'column' },
     rightPanel: { top: 0, right: 0, bottom: 0, width: '300px', zIndex: 20 },
-    bottomPanel: { bottom: 0, left: 0, right: 0, zIndex: 10, display: 'flex', flexDirection: 'column' },
+    bottomPanel: { bottom: 0, left: 0, right: 0, zIndex: 50, display: 'flex', flexDirection: 'column' }, // Increased zIndex for dropdown visibility
 
     // Header/Text
     header: { marginBottom: '20px', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '10px' },
@@ -363,5 +452,49 @@ const styles = {
     lightboxContent: { maxWidth: '80%', maxHeight: '80%', display: 'flex', flexDirection: 'column', alignItems: 'center' },
     lbImg: { maxWidth: '100%', maxHeight: '70vh' },
     lbCaption: { color: '#fff', margin: '20px 0' },
-    lbClose: { background: 'transparent', border: '1px solid #fff', color: '#fff', padding: '10px 30px', cursor: 'pointer' }
+    lbClose: { background: 'transparent', border: '1px solid #fff', color: '#fff', padding: '10px 30px', cursor: 'pointer' },
+
+    // Model Switcher (Moved)
+    modelSwitcher: {
+        position: 'absolute',
+        top: '10px', // Adjusted as requested
+        right: '20px', // Adjusted as requested
+        zIndex: 100,
+        pointerEvents: 'auto',
+        fontFamily: 'monospace'
+    },
+    modelCurrent: {
+        background: 'rgba(0, 0, 0, 0.5)',
+        border: '1px solid rgba(255, 255, 255, 0.2)',
+        borderRadius: '20px',
+        padding: '8px 16px',
+        color: '#aaa',
+        fontSize: '12px',
+        cursor: 'pointer',
+        backdropFilter: 'blur(5px)',
+        display: 'flex',
+        alignItems: 'center'
+    },
+    modelDropdown: {
+        position: 'absolute',
+        bottom: '100%', // Opening Upwards
+        right: 0,
+        marginBottom: '10px',
+        background: 'rgba(10, 10, 14, 0.95)',
+        border: '1px solid rgba(255, 255, 255, 0.1)',
+        borderRadius: '8px',
+        width: 'max-content',
+        maxHeight: '300px',
+        overflowY: 'auto',
+        padding: '5px 0',
+        boxShadow: '0 4px 20px rgba(0,0,0,0.5)'
+    },
+    modelOption: {
+        padding: '8px 16px',
+        fontSize: '12px',
+        color: '#aaa',
+        cursor: 'pointer',
+        borderBottom: '1px solid rgba(255,255,255,0.05)',
+        transition: 'all 0.2s'
+    }
 };
