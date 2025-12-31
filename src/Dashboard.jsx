@@ -71,7 +71,7 @@ export default function Dashboard() {
     const [images, setImages] = useState([]);
     const [selectedImage, setSelectedImage] = useState(null);
 
-    // Initial Planet Load
+    // Initial Planet Load & Reset
     useEffect(() => {
         if (activePlanetData) {
             setVisible(true);
@@ -80,6 +80,9 @@ export default function Dashboard() {
             setErrorMsg(null);
             setWikiData(null);
             setImages([]);
+
+            // LOGIC FIX 1: Force close image when planet changes
+            setSelectedImage(null);
 
             fetchInternalData();
         } else {
@@ -96,7 +99,7 @@ export default function Dashboard() {
 
 
     const fetchInternalData = async () => {
-        // AI Fetch Logic (Defined internally to access currentModel state correctly)
+        // AI Fetch Logic
         const cacheKey = `ai_data_${activePlanetData.name}_${currentModel}`;
         const cached = sessionCache[cacheKey];
 
@@ -149,18 +152,21 @@ export default function Dashboard() {
             }
         }
 
-        // Image Fetch
+        // Image Fetch - VISUAL UPGRADE 50+ IMAGES
         if (images.length === 0) {
             try {
                 const response = await fetch(`https://images-api.nasa.gov/search?q=${activePlanetData.name}&media_type=image`);
                 const data = await response.json();
                 if (data.collection?.items) {
-                    const items = data.collection.items.slice(0, 4).map(item => ({
-                        id: item.data[0].nasa_id,
-                        title: item.data[0].title,
-                        desc: item.data[0].description,
-                        thumb: item.links?.[0]?.href || '',
-                    })).filter(i => i.thumb);
+                    const items = data.collection.items
+                        .filter(item => item.links?.[0]?.href) // Filter items with valid links
+                        .slice(0, 50) // Take top 50 results
+                        .map(item => ({
+                            id: item.data[0].nasa_id,
+                            title: item.data[0].title,
+                            desc: item.data[0].description,
+                            thumb: item.links[0].href,
+                        }));
                     setImages(items);
                 }
             } catch (err) { console.error(err); }
@@ -238,7 +244,7 @@ export default function Dashboard() {
                     {isFeedExpanded ? 'v' : '^'}
                 </button>
 
-                {/* MODEL SWITCHER (Moved to Bottom Panel) */}
+                {/* MODEL SWITCHER (Bottom Panel) */}
                 <div
                     style={styles.modelSwitcher}
                     onMouseEnter={() => setShowModelList(true)}
@@ -358,6 +364,7 @@ export default function Dashboard() {
                 <div style={styles.header}>
                     <div style={styles.subtitle}>VISUAL FEED</div>
                 </div>
+                {/* SCROLLABLE IMAGE GRID */}
                 <div style={styles.imageGrid}>
                     {images.map(img => (
                         <div
@@ -369,15 +376,31 @@ export default function Dashboard() {
                 </div>
             </div>
 
-            {/* LIGHTBOX */}
+            {/* LIGHTBOX - CRITICAL LOGIC FIX */}
             {selectedImage && (
-                <div style={styles.lightbox} onClick={(e) => { e.stopPropagation(); setSelectedImage(null); }}>
+                <div
+                    style={styles.lightbox}
+                    onClick={(e) => {
+                        // Logic Fix 2: Prevent camera reset by swallowing event.
+                        // User requested NOT closing logic on background initially to be safe.
+                        e.preventDefault();
+                        e.stopPropagation();
+                    }}
+                >
                     <div style={styles.lightboxContent}>
-                        <img src={selectedImage.thumb} style={styles.lbImg} />
+                        <img src={selectedImage.thumb} style={styles.lbImg} alt={selectedImage.title} />
                         <div style={styles.lbCaption}>{selectedImage.title}</div>
-                        <button style={styles.lbClose} onClick={(e) => {
-                            e.preventDefault(); e.stopPropagation(); setSelectedImage(null);
-                        }}>CLOSE</button>
+                        {/* UI Fix: High contrast, top-right button */}
+                        <button
+                            style={styles.lbClose}
+                            onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                setSelectedImage(null);
+                            }}
+                        >
+                            CLOSE
+                        </button>
                     </div>
                 </div>
             )}
@@ -396,8 +419,11 @@ const styles = {
     container: { position: 'absolute', width: '100%', height: '100%', top: 0, left: 0, pointerEvents: 'none', overflow: 'hidden', fontFamily: "'Rajdhani', sans-serif" },
     panel: { ...glassStyle, padding: '20px', position: 'absolute', transition: 'all 0.5s ease-in-out' },
     leftPanel: { top: 0, left: 0, bottom: 0, width: '300px', zIndex: 20, display: 'flex', flexDirection: 'column' },
-    rightPanel: { top: 0, right: 0, bottom: 0, width: '300px', zIndex: 20 },
-    bottomPanel: { bottom: 0, left: 0, right: 0, zIndex: 50, display: 'flex', flexDirection: 'column' }, // Increased zIndex for dropdown visibility
+
+    // Updated Right Panel to support scrolling content
+    rightPanel: { top: 0, right: 0, bottom: 0, width: '300px', zIndex: 20, display: 'flex', flexDirection: 'column' },
+
+    bottomPanel: { bottom: 0, left: 0, right: 0, zIndex: 50, display: 'flex', flexDirection: 'column' },
 
     // Header/Text
     header: { marginBottom: '20px', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '10px' },
@@ -443,22 +469,43 @@ const styles = {
     tEvent: { color: '#ccc', fontSize: '13px' },
     popItem: { color: '#888', marginBottom: '5px' },
 
-    // Visuals
-    imageGrid: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' },
+    // Visuals - SCROLLABLE GRID
+    imageGrid: {
+        display: 'grid',
+        gridTemplateColumns: 'repeat(2, 1fr)',
+        gap: '10px',
+        overflowY: 'auto',
+        flex: 1,
+        padding: '10px',
+        scrollbarWidth: 'none'
+    },
     imageSlot: { aspectRatio: '1', backgroundSize: 'cover', border: '1px solid #333', cursor: 'pointer' },
 
     // Lightbox
     lightbox: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.9)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center' },
-    lightboxContent: { maxWidth: '80%', maxHeight: '80%', display: 'flex', flexDirection: 'column', alignItems: 'center' },
+    lightboxContent: { maxWidth: '80%', maxHeight: '80%', display: 'flex', flexDirection: 'column', alignItems: 'center', position: 'relative' },
     lbImg: { maxWidth: '100%', maxHeight: '70vh' },
     lbCaption: { color: '#fff', margin: '20px 0' },
-    lbClose: { background: 'transparent', border: '1px solid #fff', color: '#fff', padding: '10px 30px', cursor: 'pointer' },
 
-    // Model Switcher (Moved)
+    // UI Fix: High contrast, top-right button
+    lbClose: {
+        position: 'absolute',
+        top: '-40px',
+        right: '0px',
+        background: '#ff3333',
+        border: '2px solid white',
+        color: '#fff',
+        fontWeight: 'bold',
+        padding: '10px 30px',
+        cursor: 'pointer',
+        zIndex: 10001
+    },
+
+    // Model Switcher
     modelSwitcher: {
         position: 'absolute',
-        top: '10px', // Adjusted as requested
-        right: '20px', // Adjusted as requested
+        top: '10px',
+        right: '20px',
         zIndex: 100,
         pointerEvents: 'auto',
         fontFamily: 'monospace'
@@ -477,7 +524,7 @@ const styles = {
     },
     modelDropdown: {
         position: 'absolute',
-        bottom: '100%', // Opening Upwards
+        bottom: '100%',
         right: 0,
         marginBottom: '10px',
         background: 'rgba(10, 10, 14, 0.95)',
