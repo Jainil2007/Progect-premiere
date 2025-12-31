@@ -13,6 +13,11 @@ const MODELS = [
 const PROMPT_TEMPLATE = (planetName) => `Generate a JSON object for the celestial body "${planetName}".
 The JSON must strictly follow this schema (no markdown formatting, just raw JSON):
 {
+    "system_assets": {
+        "moons": ["Moon 1", "Moon 2", "Moon 3 (Max 5)"],
+        "satellites": ["Orbiter 1", "Telescope 1"],
+        "missions": ["Mission 1", "Mission 2"]
+    },
     "latest_news": [
         { "headline": "Headline 1", "date": "Date", "body": "Short paragraph." },
         { "headline": "Headline 2", "date": "Date", "body": "Short paragraph." },
@@ -60,7 +65,7 @@ export default function Dashboard() {
     const [showRight, setShowRight] = useState(true);
     const [showBottom, setShowBottom] = useState(true);
     const [isFeedExpanded, setIsFeedExpanded] = useState(false);
-    const [showModelList, setShowModelList] = useState(false); // Hover State
+    const [showModelList, setShowModelList] = useState(false);
 
     // Data States
     const [currentModel, setCurrentModel] = useState("gemini-3-flash-preview");
@@ -81,23 +86,18 @@ export default function Dashboard() {
             setWikiData(null);
             setImages([]);
 
-            // Force close image when planet changes
             setSelectedImage(null);
 
-            fetchInternalData(); // Use currentModel (default or last set)
+            fetchInternalData();
         } else {
             setVisible(false);
         }
     }, [activePlanetData]);
 
-    // REMOVED: useEffect dependency on [currentModel] to prevent double/stale fetching.
-    // We now handle model change fetches manually.
 
     const fetchInternalData = async (modelOverride = null) => {
-        // Logic Fix: Use override if provided, otherwise fallback to state
         const modelToUse = modelOverride || currentModel;
 
-        // AI Fetch Logic
         const cacheKey = `ai_data_${activePlanetData.name}_${modelToUse}`;
         const cached = sessionCache[cacheKey];
 
@@ -109,7 +109,6 @@ export default function Dashboard() {
             setErrorMsg(null);
             setAiData(null);
             try {
-                // Dynamic Initialization
                 const genAI = new GoogleGenerativeAI(API_KEY);
                 const model = genAI.getGenerativeModel({ model: modelToUse });
 
@@ -134,7 +133,6 @@ export default function Dashboard() {
             setLoadingAi(false);
         }
 
-        // Wiki Fetch (Preserved)
         if (!wikiData) {
             try {
                 const res = await fetch(`https://en.wikipedia.org/api/rest_v1/page/summary/${activePlanetData.name}`);
@@ -150,7 +148,6 @@ export default function Dashboard() {
             }
         }
 
-        // Image Fetch (Preserved 50+)
         if (images.length === 0) {
             try {
                 const response = await fetch(`https://images-api.nasa.gov/search?q=${activePlanetData.name}&media_type=image`);
@@ -171,11 +168,16 @@ export default function Dashboard() {
         }
     };
 
-
-    const handleWheel = (e) => {
-        if (e.deltaY < -10 && !isFeedExpanded) {
+    // Parent Logic: Handles expanding from docked state
+    const handleParentWheel = (e) => {
+        if (e.deltaY > 5 && !isFeedExpanded) {
             setIsFeedExpanded(true);
-        } else if (e.deltaY > 10 && isFeedExpanded && e.currentTarget.scrollTop === 0) {
+        }
+    };
+
+    // Container 2 Logic: Handles collapsing from expanded state
+    const handleContentWheel = (e) => {
+        if (e.deltaY < -5 && e.currentTarget.scrollTop === 0) {
             setIsFeedExpanded(false);
         }
     };
@@ -226,14 +228,17 @@ export default function Dashboard() {
                 style={{
                     ...styles.panel,
                     ...styles.bottomPanel,
-                    transform: visible && showBottom ? 'translateY(0)' : 'translateY(100%)',
+                    height: '100%',
+                    top: 0,
+                    transform: visible && showBottom
+                        ? (isFeedExpanded ? 'translateY(0)' : 'translateY(calc(100% - 200px))')
+                        : 'translateY(100%)',
                     pointerEvents: visible && showBottom ? 'auto' : 'none',
-                    height: isFeedExpanded ? '100%' : '200px',
-                    top: isFeedExpanded ? 0 : 'auto',
-                    background: isFeedExpanded ? 'rgba(5, 5, 8, 0.98)' : glassStyle.background
+                    background: isFeedExpanded ? 'rgba(5, 5, 8, 0.98)' : glassStyle.background,
+                    transition: 'transform 0.6s cubic-bezier(0.22, 1, 0.36, 1)',
                 }}
                 onClick={(e) => e.stopPropagation()}
-                onWheel={handleWheel}
+                onWheel={handleParentWheel}
             >
                 <button
                     style={styles.bottomToggle}
@@ -242,21 +247,21 @@ export default function Dashboard() {
                     {isFeedExpanded ? 'v' : '^'}
                 </button>
 
-                {/* MODEL SWITCHER (Fixed Hover + State Logic) */}
+                {/* MODEL SWITCHER */}
                 <div
                     style={styles.modelSwitcher}
                     onMouseEnter={() => setShowModelList(true)}
                     onMouseLeave={() => setShowModelList(false)}
                 >
-                    {/* The Pill */}
                     <div style={styles.modelCurrent}>
                         <span style={{ opacity: 0.5, marginRight: '8px' }}>MODEL:</span>
                         {currentModel}
                     </div>
-
-                    {/* The List */}
                     {showModelList && (
-                        <div style={styles.modelDropdown}>
+                        <div
+                            style={styles.modelDropdown}
+                            onWheel={(e) => e.stopPropagation()}
+                        >
                             {MODELS.map(model => (
                                 <div
                                     key={model}
@@ -267,7 +272,6 @@ export default function Dashboard() {
                                     }}
                                     onClick={(e) => {
                                         e.stopPropagation();
-                                        // LOGIC FIX: Update State AND Fetch Immediately
                                         setCurrentModel(model);
                                         fetchInternalData(model);
                                         setShowModelList(false);
@@ -280,74 +284,116 @@ export default function Dashboard() {
                     )}
                 </div>
 
-                <div style={{ opacity: isFeedExpanded ? 0 : 1, ...styles.panelLabel }}>
-                    MISSION FEED | {loadingAi ? 'UPLINKING...' : 'ONLINE'}
+                {/* --- CONTAINER 1: DOCKED VIEW (Fades Out) --- */}
+                <div style={{
+                    position: 'absolute', top: 0, left: 0, width: '100%', height: '200px',
+                    opacity: isFeedExpanded ? 0 : 1,
+                    pointerEvents: isFeedExpanded ? 'none' : 'auto',
+                    transition: 'opacity 0.3s ease',
+                }}>
+                    <div style={{ ...styles.panelLabel, opacity: 1 }}>
+                        SYSTEM ASSETS | {loadingAi ? 'UPLINKING...' : 'ONLINE'}
+                    </div>
+
+                    <div style={styles.bottomHeaderGrid}>
+                        {/* Col 1: Moons */}
+                        <div style={styles.assetCol}>
+                            <div style={styles.assetTitle}>MOONS</div>
+                            <div style={styles.assetList}>
+                                {aiData?.system_assets?.moons?.map((m, i) => (
+                                    <div key={i} style={styles.assetItem}>• {m}</div>
+                                )) || <div style={{ color: '#666', fontSize: '10px' }}>Scanning...</div>}
+                            </div>
+                        </div>
+                        {/* Col 2: Orbital Assets */}
+                        <div style={styles.assetCol}>
+                            <div style={styles.assetTitle}>ORBITAL ASSETS</div>
+                            <div style={styles.assetList}>
+                                {aiData?.system_assets?.satellites?.map((s, i) => (
+                                    <div key={i} style={styles.assetItem}>• {s}</div>
+                                )) || <div style={{ color: '#666', fontSize: '10px' }}>Scanning...</div>}
+                            </div>
+                        </div>
+                        {/* Col 3: Missions */}
+                        <div style={styles.assetCol}>
+                            <div style={styles.assetTitle}>MISSIONS</div>
+                            <div style={styles.assetList}>
+                                {aiData?.system_assets?.missions?.map((m, i) => (
+                                    <div key={i} style={styles.assetItem}>• {m}</div>
+                                )) || <div style={{ color: '#666', fontSize: '10px' }}>Scanning...</div>}
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
-                <div style={{ height: '100%', overflowY: isFeedExpanded ? 'auto' : 'hidden', padding: isFeedExpanded ? '40px' : '0' }}>
-                    {loadingAi ? (
-                        <div className="loader"></div>
-                    ) : errorMsg ? (
-                        <div className="error-text">{errorMsg}</div>
-                    ) : isFeedExpanded ? (
-                        // EXPANDED MAGAZINE VIEW
-                        <div style={styles.magazineLayout}>
-                            {/* Hero Section (Wiki) */}
-                            {wikiData && (
-                                <div style={styles.magHero}>
-                                    {wikiData.image && <img src={wikiData.image} style={styles.heroImage} alt="Planet" />}
-                                    <div style={styles.heroContent}>
-                                        <h1 style={styles.magTitle}>{activePlanetData.name} OFFLINE ARCHIVE</h1>
-                                        <p style={styles.magIntro}>{wikiData.intro}</p>
+                {/* --- CONTAINER 2: EXPANDED VIEW (Fades In) --- */}
+                <div style={{
+                    position: 'absolute', top: 0, left: 0, width: '100%', height: '100%',
+                    opacity: isFeedExpanded ? 1 : 0,
+                    pointerEvents: isFeedExpanded ? 'auto' : 'none',
+                    transition: 'opacity 0.5s ease 0.2s',
+                    paddingTop: '60px',
+                    overflowY: 'auto'
+                }}
+                    onWheel={handleContentWheel}
+                >
+                    <div style={{ padding: '20px' }}>
+                        <div style={{ ...styles.panelLabel, position: 'relative', top: '-10px', left: 0, marginBottom: '20px' }}>
+                            MISSION FEED | {activePlanetData.name}
+                        </div>
+
+                        {loadingAi ? (
+                            <div className="loader"></div>
+                        ) : errorMsg ? (
+                            <div className="error-text">{errorMsg}</div>
+                        ) : (
+                            <div style={styles.magazineLayout}>
+                                {/* Hero Section (Wiki) */}
+                                {wikiData && (
+                                    <div style={styles.magHero}>
+                                        {wikiData.image && <img src={wikiData.image} style={styles.heroImage} alt="Planet" />}
+                                        <div style={styles.heroContent}>
+                                            <h1 style={styles.magTitle}>{activePlanetData.name} OFFLINE ARCHIVE</h1>
+                                            <p style={styles.magIntro}>{wikiData.intro}</p>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Main Grid (AI Data) */}
+                                <div style={styles.magGrid}>
+                                    {/* News Column */}
+                                    <div style={styles.mainCol}>
+                                        <h3 style={styles.sectionHeader}>LATEST INTELLIGENCE</h3>
+                                        {aiData?.latest_news?.map((news, i) => (
+                                            <div key={i} style={styles.newsCard}>
+                                                <div style={styles.newsDate}>{news.date}</div>
+                                                <div style={styles.newsHead}>{news.headline}</div>
+                                                <div style={styles.newsBody}>{news.body}</div>
+                                            </div>
+                                        ))}
+                                    </div>
+
+                                    {/* Timeline Column */}
+                                    <div style={styles.sideCol}>
+                                        <h3 style={styles.sectionHeader}>HISTORICAL RECORD</h3>
+                                        {aiData?.history_timeline?.map((evt, i) => (
+                                            <div key={i} style={styles.timelineItem}>
+                                                <div style={styles.tDate}>{evt.date}</div>
+                                                <div style={styles.tEvent}>{evt.event}</div>
+                                            </div>
+                                        ))}
+
+                                        <h3 style={{ ...styles.sectionHeader, marginTop: '40px' }}>CULTURAL REFS</h3>
+                                        {aiData?.pop_culture?.map((p, i) => (
+                                            <div key={i} style={styles.popItem}>• {p}</div>
+                                        ))}
                                     </div>
                                 </div>
-                            )}
-
-                            {/* Main Grid (AI Data) */}
-                            <div style={styles.magGrid}>
-                                {/* News Column */}
-                                <div style={styles.mainCol}>
-                                    <h3 style={styles.sectionHeader}>LATEST INTELLIGENCE</h3>
-                                    {aiData?.latest_news?.map((news, i) => (
-                                        <div key={i} style={styles.newsCard}>
-                                            <div style={styles.newsDate}>{news.date}</div>
-                                            <div style={styles.newsHead}>{news.headline}</div>
-                                            <div style={styles.newsBody}>{news.body}</div>
-                                        </div>
-                                    ))}
-                                </div>
-
-                                {/* Timeline Column */}
-                                <div style={styles.sideCol}>
-                                    <h3 style={styles.sectionHeader}>HISTORICAL RECORD</h3>
-                                    {aiData?.history_timeline?.map((evt, i) => (
-                                        <div key={i} style={styles.timelineItem}>
-                                            <div style={styles.tDate}>{evt.date}</div>
-                                            <div style={styles.tEvent}>{evt.event}</div>
-                                        </div>
-                                    ))}
-
-                                    <h3 style={{ ...styles.sectionHeader, marginTop: '40px' }}>CULTURAL REFS</h3>
-                                    {aiData?.pop_culture?.map((p, i) => (
-                                        <div key={i} style={styles.popItem}>• {p}</div>
-                                    ))}
-                                </div>
                             </div>
-                        </div>
-                    ) : (
-                        // COLLAPSED TICKER VIEW
-                        <div style={styles.tickerContainer}>
-                            <div style={styles.tickerLabel}>LIVE WIRE:</div>
-                            <div style={styles.tickerScroll}>
-                                {aiData?.latest_news?.map((news, i) => (
-                                    <span key={i} style={styles.tickerItem}>
-                                        <span style={{ color: '#00ccff' }}>✦</span> {news.headline}
-                                    </span>
-                                ))}
-                            </div>
-                        </div>
-                    )}
+                        )}
+                    </div>
                 </div>
+
             </div>
 
             {/* PANEL 3: RIGHT (Visuals) */}
@@ -442,11 +488,22 @@ const styles = {
     dragHandle: { width: '40px', height: '4px', background: 'rgba(255,255,255,0.3)', borderRadius: '2px', margin: '8px auto 0 auto', cursor: 'ns-resize' },
     closeButton: { marginTop: 'auto', background: 'rgba(255,50,50,0.2)', border: '1px solid red', color: 'white', padding: '10px', cursor: 'pointer', pointerEvents: 'auto' },
 
-    panelLabel: { position: 'absolute', top: '20px', left: '20px', color: '#666', fontSize: '10px', letterSpacing: '2px' },
-    tickerContainer: { display: 'flex', alignItems: 'center', height: '100%', padding: '0 20px', overflowX: 'auto' },
-    tickerLabel: { color: '#00ccff', marginRight: '20px', fontWeight: 'bold' },
-    tickerScroll: { display: 'flex', gap: '30px', whiteSpace: 'nowrap' },
-    tickerItem: { color: '#fff', fontFamily: 'monospace' },
+    // New Bottom Panel Styles
+    panelLabel: { color: '#666', fontSize: '10px', letterSpacing: '2px', marginBottom: '10px' },
+
+    // Grid Header (Top 200px)
+    bottomHeaderGrid: {
+        height: '100%', // Fills the Docked Container (200px)
+        display: 'grid',
+        gridTemplateColumns: '1fr 1fr 1fr',
+        gap: '10px',
+        padding: '30px 20px 10px 20px',
+        borderBottom: '1px solid rgba(255,255,255,0.1)'
+    },
+    assetCol: { display: 'flex', flexDirection: 'column', overflow: 'hidden' },
+    assetTitle: { color: '#00ccff', fontSize: '12px', marginBottom: '5px', fontWeight: 'bold', letterSpacing: '1px' },
+    assetList: { display: 'flex', flexDirection: 'column', gap: '2px', overflowY: 'auto', fontSize: '11px', color: '#ddd' },
+    assetItem: { whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' },
 
     magazineLayout: { maxWidth: '1200px', margin: '0 auto', paddingBottom: '100px' },
     magHero: { display: 'flex', gap: '40px', marginBottom: '60px', alignItems: 'center' },
