@@ -60,7 +60,7 @@ export default function Dashboard() {
     const [showRight, setShowRight] = useState(true);
     const [showBottom, setShowBottom] = useState(true);
     const [isFeedExpanded, setIsFeedExpanded] = useState(false);
-    const [showModelList, setShowModelList] = useState(false); // Hover State
+    const [showModelList, setShowModelList] = useState(false);
 
     // Data States
     const [currentModel, setCurrentModel] = useState("gemini-3-flash-preview");
@@ -81,23 +81,18 @@ export default function Dashboard() {
             setWikiData(null);
             setImages([]);
 
-            // Force close image when planet changes
             setSelectedImage(null);
 
-            fetchInternalData(); // Use currentModel (default or last set)
+            fetchInternalData();
         } else {
             setVisible(false);
         }
     }, [activePlanetData]);
 
-    // REMOVED: useEffect dependency on [currentModel] to prevent double/stale fetching.
-    // We now handle model change fetches manually.
 
     const fetchInternalData = async (modelOverride = null) => {
-        // Logic Fix: Use override if provided, otherwise fallback to state
         const modelToUse = modelOverride || currentModel;
 
-        // AI Fetch Logic
         const cacheKey = `ai_data_${activePlanetData.name}_${modelToUse}`;
         const cached = sessionCache[cacheKey];
 
@@ -109,7 +104,6 @@ export default function Dashboard() {
             setErrorMsg(null);
             setAiData(null);
             try {
-                // Dynamic Initialization
                 const genAI = new GoogleGenerativeAI(API_KEY);
                 const model = genAI.getGenerativeModel({ model: modelToUse });
 
@@ -134,7 +128,6 @@ export default function Dashboard() {
             setLoadingAi(false);
         }
 
-        // Wiki Fetch (Preserved)
         if (!wikiData) {
             try {
                 const res = await fetch(`https://en.wikipedia.org/api/rest_v1/page/summary/${activePlanetData.name}`);
@@ -150,7 +143,6 @@ export default function Dashboard() {
             }
         }
 
-        // Image Fetch (Preserved 50+)
         if (images.length === 0) {
             try {
                 const response = await fetch(`https://images-api.nasa.gov/search?q=${activePlanetData.name}&media_type=image`);
@@ -173,9 +165,13 @@ export default function Dashboard() {
 
 
     const handleWheel = (e) => {
-        if (e.deltaY < -10 && !isFeedExpanded) {
+        // Logic Fix 2: Inverted Scroll Trigger
+        // Expand on Wheel Down (deltaY > 0)
+        if (e.deltaY > 5 && !isFeedExpanded) {
             setIsFeedExpanded(true);
-        } else if (e.deltaY > 10 && isFeedExpanded && e.currentTarget.scrollTop === 0) {
+        }
+        // Collapse on Wheel Up (deltaY < 0) when at top
+        else if (e.deltaY < -5 && isFeedExpanded && e.currentTarget.scrollTop === 0) {
             setIsFeedExpanded(false);
         }
     };
@@ -226,11 +222,16 @@ export default function Dashboard() {
                 style={{
                     ...styles.panel,
                     ...styles.bottomPanel,
-                    transform: visible && showBottom ? 'translateY(0)' : 'translateY(100%)',
+                    // Visual Fix 3: GPU Animation using transform
+                    height: '100%',
+                    top: 0,
+                    // If expanded, move to 0. If collapsed, move down but keep 200px visible.
+                    transform: visible && showBottom
+                        ? (isFeedExpanded ? 'translateY(0)' : 'translateY(calc(100% - 200px))')
+                        : 'translateY(100%)',
                     pointerEvents: visible && showBottom ? 'auto' : 'none',
-                    height: isFeedExpanded ? '100%' : '200px',
-                    top: isFeedExpanded ? 0 : 'auto',
-                    background: isFeedExpanded ? 'rgba(5, 5, 8, 0.98)' : glassStyle.background
+                    background: isFeedExpanded ? 'rgba(5, 5, 8, 0.98)' : glassStyle.background,
+                    transition: 'transform 0.6s cubic-bezier(0.22, 1, 0.36, 1)', // Smooth physics
                 }}
                 onClick={(e) => e.stopPropagation()}
                 onWheel={handleWheel}
@@ -242,21 +243,23 @@ export default function Dashboard() {
                     {isFeedExpanded ? 'v' : '^'}
                 </button>
 
-                {/* MODEL SWITCHER (Fixed Hover + State Logic) */}
+                {/* MODEL SWITCHER */}
                 <div
                     style={styles.modelSwitcher}
                     onMouseEnter={() => setShowModelList(true)}
                     onMouseLeave={() => setShowModelList(false)}
                 >
-                    {/* The Pill */}
                     <div style={styles.modelCurrent}>
                         <span style={{ opacity: 0.5, marginRight: '8px' }}>MODEL:</span>
                         {currentModel}
                     </div>
 
-                    {/* The List */}
                     {showModelList && (
-                        <div style={styles.modelDropdown}>
+                        <div
+                            style={styles.modelDropdown}
+                            // Logic Fix 1: Stop scroll propagation in model list
+                            onWheel={(e) => e.stopPropagation()}
+                        >
                             {MODELS.map(model => (
                                 <div
                                     key={model}
@@ -267,7 +270,6 @@ export default function Dashboard() {
                                     }}
                                     onClick={(e) => {
                                         e.stopPropagation();
-                                        // LOGIC FIX: Update State AND Fetch Immediately
                                         setCurrentModel(model);
                                         fetchInternalData(model);
                                         setShowModelList(false);
