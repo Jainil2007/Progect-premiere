@@ -60,7 +60,7 @@ export default function Dashboard() {
     const [showRight, setShowRight] = useState(true);
     const [showBottom, setShowBottom] = useState(true);
     const [isFeedExpanded, setIsFeedExpanded] = useState(false);
-    const [showModelList, setShowModelList] = useState(false);
+    const [showModelList, setShowModelList] = useState(false); // Hover State
 
     // Data States
     const [currentModel, setCurrentModel] = useState("gemini-3-flash-preview");
@@ -81,26 +81,24 @@ export default function Dashboard() {
             setWikiData(null);
             setImages([]);
 
-            // LOGIC FIX 1: Force close image when planet changes
+            // Force close image when planet changes
             setSelectedImage(null);
 
-            fetchInternalData();
+            fetchInternalData(); // Use currentModel (default or last set)
         } else {
             setVisible(false);
         }
     }, [activePlanetData]);
 
-    // Re-fetch on model switch
-    useEffect(() => {
-        if (activePlanetData) {
-            fetchInternalData();
-        }
-    }, [currentModel]);
+    // REMOVED: useEffect dependency on [currentModel] to prevent double/stale fetching.
+    // We now handle model change fetches manually.
 
+    const fetchInternalData = async (modelOverride = null) => {
+        // Logic Fix: Use override if provided, otherwise fallback to state
+        const modelToUse = modelOverride || currentModel;
 
-    const fetchInternalData = async () => {
         // AI Fetch Logic
-        const cacheKey = `ai_data_${activePlanetData.name}_${currentModel}`;
+        const cacheKey = `ai_data_${activePlanetData.name}_${modelToUse}`;
         const cached = sessionCache[cacheKey];
 
         if (cached) {
@@ -113,7 +111,7 @@ export default function Dashboard() {
             try {
                 // Dynamic Initialization
                 const genAI = new GoogleGenerativeAI(API_KEY);
-                const model = genAI.getGenerativeModel({ model: currentModel });
+                const model = genAI.getGenerativeModel({ model: modelToUse });
 
                 const result = await model.generateContent(PROMPT_TEMPLATE(activePlanetData.name));
                 const response = await result.response;
@@ -128,7 +126,7 @@ export default function Dashboard() {
             } catch (err) {
                 console.error("AI Fetch Error", err);
                 if (err.message && err.message.includes("429")) {
-                    setErrorMsg("CRITICAL: API Quota Exceeded. Model Unavailable.");
+                    setErrorMsg(`CRITICAL: API Quota Exceeded for ${modelToUse}. Model Unavailable.`);
                 } else {
                     setErrorMsg("Connection Failed.");
                 }
@@ -136,7 +134,7 @@ export default function Dashboard() {
             setLoadingAi(false);
         }
 
-        // Wiki Fetch
+        // Wiki Fetch (Preserved)
         if (!wikiData) {
             try {
                 const res = await fetch(`https://en.wikipedia.org/api/rest_v1/page/summary/${activePlanetData.name}`);
@@ -152,15 +150,15 @@ export default function Dashboard() {
             }
         }
 
-        // Image Fetch - VISUAL UPGRADE 50+ IMAGES
+        // Image Fetch (Preserved 50+)
         if (images.length === 0) {
             try {
                 const response = await fetch(`https://images-api.nasa.gov/search?q=${activePlanetData.name}&media_type=image`);
                 const data = await response.json();
                 if (data.collection?.items) {
                     const items = data.collection.items
-                        .filter(item => item.links?.[0]?.href) // Filter items with valid links
-                        .slice(0, 50) // Take top 50 results
+                        .filter(item => item.links?.[0]?.href)
+                        .slice(0, 50)
                         .map(item => ({
                             id: item.data[0].nasa_id,
                             title: item.data[0].title,
@@ -244,17 +242,19 @@ export default function Dashboard() {
                     {isFeedExpanded ? 'v' : '^'}
                 </button>
 
-                {/* MODEL SWITCHER (Bottom Panel) */}
+                {/* MODEL SWITCHER (Fixed Hover + State Logic) */}
                 <div
                     style={styles.modelSwitcher}
                     onMouseEnter={() => setShowModelList(true)}
                     onMouseLeave={() => setShowModelList(false)}
                 >
+                    {/* The Pill */}
                     <div style={styles.modelCurrent}>
                         <span style={{ opacity: 0.5, marginRight: '8px' }}>MODEL:</span>
                         {currentModel}
                     </div>
-                    {/* Dropdown Opening Upwards */}
+
+                    {/* The List */}
                     {showModelList && (
                         <div style={styles.modelDropdown}>
                             {MODELS.map(model => (
@@ -267,7 +267,9 @@ export default function Dashboard() {
                                     }}
                                     onClick={(e) => {
                                         e.stopPropagation();
+                                        // LOGIC FIX: Update State AND Fetch Immediately
                                         setCurrentModel(model);
+                                        fetchInternalData(model);
                                         setShowModelList(false);
                                     }}
                                 >
@@ -376,21 +378,25 @@ export default function Dashboard() {
                 </div>
             </div>
 
-            {/* LIGHTBOX - CRITICAL LOGIC FIX */}
+            {/* LIGHTBOX */}
             {selectedImage && (
                 <div
                     style={styles.lightbox}
+                    onPointerDown={(e) => e.stopPropagation()}
+                    onWheel={(e) => e.stopPropagation()}
                     onClick={(e) => {
-                        // Logic Fix 2: Prevent camera reset by swallowing event.
-                        // User requested NOT closing logic on background initially to be safe.
                         e.preventDefault();
                         e.stopPropagation();
+                        setSelectedImage(null);
                     }}
                 >
-                    <div style={styles.lightboxContent}>
+                    <div
+                        style={styles.lightboxContent}
+                        onClick={(e) => e.stopPropagation()}
+                    >
                         <img src={selectedImage.thumb} style={styles.lbImg} alt={selectedImage.title} />
                         <div style={styles.lbCaption}>{selectedImage.title}</div>
-                        {/* UI Fix: High contrast, top-right button */}
+
                         <button
                             style={styles.lbClose}
                             onClick={(e) => {
@@ -419,30 +425,23 @@ const styles = {
     container: { position: 'absolute', width: '100%', height: '100%', top: 0, left: 0, pointerEvents: 'none', overflow: 'hidden', fontFamily: "'Rajdhani', sans-serif" },
     panel: { ...glassStyle, padding: '20px', position: 'absolute', transition: 'all 0.5s ease-in-out' },
     leftPanel: { top: 0, left: 0, bottom: 0, width: '300px', zIndex: 20, display: 'flex', flexDirection: 'column' },
-
-    // Updated Right Panel to support scrolling content
     rightPanel: { top: 0, right: 0, bottom: 0, width: '300px', zIndex: 20, display: 'flex', flexDirection: 'column' },
-
     bottomPanel: { bottom: 0, left: 0, right: 0, zIndex: 50, display: 'flex', flexDirection: 'column' },
 
-    // Header/Text
     header: { marginBottom: '20px', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '10px' },
     title: { margin: 0, fontSize: '32px', color: 'white' },
     subtitle: { fontSize: '10px', color: '#00ccff', letterSpacing: '3px', fontWeight: 'bold' },
 
-    // DataRow
     dataRow: { display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid rgba(255,255,255,0.05)', padding: '5px 0' },
     dataLabel: { color: '#888', fontSize: '12px' },
     dataValue: { color: '#fff', fontFamily: 'monospace' },
 
-    // Toggles
     sideToggleRight: { position: 'absolute', right: '-30px', top: '50%', width: '30px', height: '60px', ...glassStyle, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', cursor: 'pointer', pointerEvents: 'auto' },
     sideToggleLeft: { position: 'absolute', left: '-30px', top: '50%', width: '30px', height: '60px', ...glassStyle, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', cursor: 'pointer', pointerEvents: 'auto' },
     bottomToggle: { position: 'absolute', top: '-30px', left: '50%', transform: 'translateX(-50%)', width: '60px', height: '30px', ...glassStyle, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', cursor: 'pointer', pointerEvents: 'auto' },
     dragHandle: { width: '40px', height: '4px', background: 'rgba(255,255,255,0.3)', borderRadius: '2px', margin: '8px auto 0 auto', cursor: 'ns-resize' },
     closeButton: { marginTop: 'auto', background: 'rgba(255,50,50,0.2)', border: '1px solid red', color: 'white', padding: '10px', cursor: 'pointer', pointerEvents: 'auto' },
 
-    // Feed Layout
     panelLabel: { position: 'absolute', top: '20px', left: '20px', color: '#666', fontSize: '10px', letterSpacing: '2px' },
     tickerContainer: { display: 'flex', alignItems: 'center', height: '100%', padding: '0 20px', overflowX: 'auto' },
     tickerLabel: { color: '#00ccff', marginRight: '20px', fontWeight: 'bold' },
@@ -469,7 +468,6 @@ const styles = {
     tEvent: { color: '#ccc', fontSize: '13px' },
     popItem: { color: '#888', marginBottom: '5px' },
 
-    // Visuals - SCROLLABLE GRID
     imageGrid: {
         display: 'grid',
         gridTemplateColumns: 'repeat(2, 1fr)',
@@ -481,13 +479,11 @@ const styles = {
     },
     imageSlot: { aspectRatio: '1', backgroundSize: 'cover', border: '1px solid #333', cursor: 'pointer' },
 
-    // Lightbox
-    lightbox: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.9)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center' },
+    lightbox: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.9)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'auto' },
     lightboxContent: { maxWidth: '80%', maxHeight: '80%', display: 'flex', flexDirection: 'column', alignItems: 'center', position: 'relative' },
     lbImg: { maxWidth: '100%', maxHeight: '70vh' },
     lbCaption: { color: '#fff', margin: '20px 0' },
 
-    // UI Fix: High contrast, top-right button
     lbClose: {
         position: 'absolute',
         top: '-40px',
@@ -501,12 +497,11 @@ const styles = {
         zIndex: 10001
     },
 
-    // Model Switcher
     modelSwitcher: {
         position: 'absolute',
         top: '10px',
         right: '20px',
-        zIndex: 100,
+        zIndex: 200,
         pointerEvents: 'auto',
         fontFamily: 'monospace'
     },
@@ -526,14 +521,16 @@ const styles = {
         position: 'absolute',
         bottom: '100%',
         right: 0,
-        marginBottom: '10px',
+        display: 'flex',
+        flexDirection: 'column',
+        marginBottom: '0',
+        paddingBottom: '10px',
         background: 'rgba(10, 10, 14, 0.95)',
         border: '1px solid rgba(255, 255, 255, 0.1)',
         borderRadius: '8px',
         width: 'max-content',
         maxHeight: '300px',
         overflowY: 'auto',
-        padding: '5px 0',
         boxShadow: '0 4px 20px rgba(0,0,0,0.5)'
     },
     modelOption: {
